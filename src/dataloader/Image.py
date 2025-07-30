@@ -35,7 +35,6 @@ class ImageDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		"""
-			return patch, label of center pixel, indices
 			Args	
 				- idx (int): the idx ranged from 0 to length
 			Returns
@@ -65,7 +64,7 @@ class ImageDataset(torch.utils.data.Dataset):
 
 class FolderDataset(torch.utils.data.Dataset):
 	"""
-		Image dataset for model
+		Folder dataset for model
 		Args:
 			- data(list): merged data that is used for train, valid, and test
 			- gt(list): ground truth
@@ -88,7 +87,6 @@ class FolderDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		"""
-			return patch, label of center pixel, indices
 			Args	
 				- idx (int): the idx ranged from 0 to length
 			Returns

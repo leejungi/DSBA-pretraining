@@ -2,7 +2,7 @@
 	DSBA Pretraining Code
 	Copyright 2025. Jungi Lee All rights reserved.
 
-	@description: CIFAR10 image dataset
+	@description: Tinyimagenet image dataset
 	@author: JungiLee
 """
 import os

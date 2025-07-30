@@ -156,7 +156,7 @@ class CLSModule:
 
 	def predict(self, loader):
 		"""
-			Validation step. Model is not trained. Just predict the label or anomaly score for data.
+			prediction step. 
 			Parameters
 				- loader (torch.utils.data.DataLoader): data loader for validation and test data
 			Returns
