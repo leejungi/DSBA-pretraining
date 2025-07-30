@@ -1,0 +1,4 @@
+src/EXP*
+src/wandb
+src/log
+src/ckpt
