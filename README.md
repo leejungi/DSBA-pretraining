@@ -1,10 +1,8 @@
 # DSBA Pretraining CV
---- 
 This is DSBA pretraining CV code.
 This repository includes ResNet&ViT training code on CIFAR10/100 and TinyImagenet.
 
 # Results
----
 - SGD with 0.1 lr
 
 |Model|CIFAR10|CIFAR100|TinyImagenet|
@@ -20,19 +18,17 @@ This repository includes ResNet&ViT training code on CIFAR10/100 and TinyImagene
 
 
 # Vanilla Gradient Visualization
----
 
 1. Original Image (CIFAR10 class "7")
-![Origin](fig/Origin7.pdf)
+![Origin](./fig/Origin7.pdf)
 2. ResNet50 
-![R50](fig/R50.pdf)
+![R50](./fig/R50.pdf)
 3. ViT
-![ViT](fig/ViT.pdf)
+![ViT](./fig/ViT.pdf)
 
 
 
 # Example Code
----
 
 Simple execute the run.sh file
 ```bash
