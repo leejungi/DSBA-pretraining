@@ -1,0 +1,7 @@
+cv/src/EXP*
+cv/src/wandb
+cv/src/log
+cv/src/ckpt
+nlp/src/wandb
+nlp/src/ckpt
+
