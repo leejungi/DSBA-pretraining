@@ -35,8 +35,9 @@ def parse(parser=None):
 
 	#Hyperparameter
 	parser.add_argument("--epoch", type=int, default=5, help="The number of epochs")
-	parser.add_argument("--batch", type=int, default=16, help="The number of batch size")
+	parser.add_argument("--batch", type=int, default=32, help="The number of batch size")
 	parser.add_argument("--lr", type=float, default=5e-5, help="Learning Rate")
+	parser.add_argument("--accum_step", type=int, default=1, help="Gradient Accumulation step")
 
 	#Model
 	parser.add_argument("--model", type=str, choices=['bert','modernbert'], default="bert", help="Model type")

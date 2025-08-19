@@ -18,16 +18,26 @@ from utils import parse
 from transformers import set_seed
 from datasets import load_dataset
 from sklearn.model_selection import train_test_split
+from accelerate import Accelerator
+from collections import Counter
 
-def train_iter(model, batch, optimizer, criterion, device):
+def train_iter(model, batch, optimizer, criterion, device, accelerator, accum_step, n):
 	X= {k: v.to(device) for k, v in batch[0].items()}
 	Y=batch[1].to(device)
+#	X= {k: v for k, v in batch[0].items()}
+#	Y=batch[1]
+#	X= batch 
+#	Y=batch['label']
+#	del batch['label']
 	prob = model(X)
 	loss = criterion(prob,Y)
 
-	optimizer.zero_grad()
+#	accelerator.backward(loss)
+	loss /=accum_step
 	loss.backward()
-	optimizer.step()
+	if (n%accum_step)==0:
+		optimizer.step()
+		optimizer.zero_grad()
 	wandb.log({'train_loss': loss.item()})
 	return loss.item()
 
@@ -42,6 +52,9 @@ def valid_iter(model, loader, criterion, device):
 		for batch in loader:
 			X= {key : value.to(device) for key, value in batch[0].items()}
 			Y=batch[1].to(device)
+#			X= batch
+#			Y=batch['label']
+#			del batch['label']
 			prob= model(X)
 			loss=criterion(prob,Y)
 			loss_total.append(loss.item())
@@ -55,7 +68,7 @@ def calculate_accuracy(logits, label):
 	return correct 
 
 def main(cfg) :
-	wandb.init(project="DSBA pretraining", name=f"{cfg['model']}", config=cfg)
+	wandb.init(project="DSBA pretraining", name=f"{cfg['model']}-{cfg['accum_step']}", config=cfg)
 
 	# Set device
 	device= cfg['device']
@@ -63,7 +76,7 @@ def main(cfg) :
 	if cfg['model'] == 'bert':
 		model_id = "bert-base-uncased"
 	elif cfg['model'] == 'modernbert':
-		model_id = "ModernBERT-base"
+		model_id = "answerdotai/ModernBERT-base" #"ModernBERT-base"
 	else:
 		raise ValueError(f"Model name ({cfg['model']}) is not available")
 
@@ -85,28 +98,58 @@ def main(cfg) :
 	valid_loader = get_dataloader(cfg, valid_x, valid_y, model_id, split="valid")	
 	test_loader = get_dataloader(cfg, test_x, test_y, model_id, split="test")	
 
+	print(len(train_x), Counter(train_y.ravel()))
+	print(len(valid_x), Counter(valid_y.ravel()))
+	print(len(test_x), Counter(test_y.ravel()))
+
+#	train_loader = get_dataloader(cfg, 'train')
+#	valid_loader = get_dataloader(cfg, 'valid')
+#	test_loader = get_dataloader(cfg, 'test')
+
+
+
 	# Set optimizer
 	optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'])
-	criterion = nn.CrossEntropyLoss().to(device)
+	criterion = nn.CrossEntropyLoss()#.to(device)
 
 
 	# Train & validation for each epoch
-	total_batch = len(train_x)
 	valid_loss=[]
+	accum_step=cfg['accum_step']
+	print(f"Accelerator with {cfg['accum_step']} accum step")
+#	accelerator = Accelerator(gradient_accumulation_steps=cfg['accum_step'])
+#	model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
+#	model, optimizer, train_loader, valid_loader, test_loader = accelerator.prepare(model, optimizer, train_loader, valid_loader, test_loader)
+	accelerator=None
 	for epoch in tqdm(range(1,cfg['epoch']+1)):
 		#Train model
 		model.train()
 		train_loss= []
+		n=1
 		for batch in train_loader:
-			loss = train_iter(model, batch, optimizer, criterion, device)
-			train_loss.append(loss)
-		wandb.log({'train_avg_loss': np.mean(train_loss)}, step=epoch)
+#			with accelerator.accumulate(model):
+#			loss = train_iter(model, batch, optimizer, criterion, device, accelerator, cfg['accum_step'], n)
+			X= {k: v.to(device) for k, v in batch[0].items()}
+			Y=batch[1].to(device)
+			prob = model(X)
+			loss = criterion(prob,Y)
+
+			loss /=accum_step
+			loss.backward()
+			if (n%accum_step)==0:
+				optimizer.step()
+				optimizer.zero_grad()
+			wandb.log({'train_loss': loss.item()})
+
+			train_loss.append(loss.item())
+			n+=1
+		wandb.log({'train_avg_loss': np.mean(train_loss)})
 
 		#Validate model
 		loss, acc = valid_iter(model, valid_loader, criterion, device)
 		valid_loss.append(loss)
-		wandb.log({'valid_avg_loss': loss}, step=epoch)
-		wandb.log({'valid_acc': acc}, step=epoch)
+		wandb.log({'valid_avg_loss': loss})
+		wandb.log({'valid_acc': acc})
 
 		#model save
 		torch.save(model.state_dict(), os.path.join(cfg['ckpt_path'], f"{cfg['model']}_{epoch-1}.pth"))

@@ -9,6 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 from typing import Union, List, Tuple, Literal
 from transformers import AutoTokenizer
 import numpy as np
+import copy
 
 def to_tensor(x):
 	if type(x)==list:
@@ -22,16 +23,16 @@ class IMDBDatset(torch.utils.data.Dataset):
 		self.data = data
 		self.label = label
 		self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-
 	   
 	def __len__(self):
 		return len(self.data)
 
 	def __getitem__(self, idx) -> Tuple[dict, int]:
-		data = self.data[idx]
+		data = copy.deepcopy(self.data[idx])
 		data = self.tokenizer(data, return_tensors="pt", padding="max_length", truncation=True, max_length=self.cfg['max_length'])
-		data['label']=self.label[idx]
+		data['label']=copy.deepcopy(self.label[idx])
 		return data
+
 
 
 	@staticmethod
@@ -47,10 +48,12 @@ class IMDBDatset(torch.utils.data.Dataset):
 				label : torch.Tensor
 			}
 		"""
-		outputs={}
-		for k in ['input_ids', 'token_type_ids', 'attention_mask']: #, 'label']:
-			outputs[k] = to_tensor([batch[i][k] for i in range(len(batch))]).squeeze(1)
 		labels = to_tensor([batch[i]['label'] for i in range(len(batch))])
+		outputs={}
+		for k in batch[0].keys():
+			if k=="label":
+				continue
+			outputs[k] = to_tensor([batch[i][k] for i in range(len(batch))]).squeeze(1)
 		return outputs, labels
 	
 def get_dataloader(cfg, data, label, model_id, split : Literal['train', 'valid', 'test']) -> torch.utils.data.DataLoader:
@@ -58,5 +61,5 @@ def get_dataloader(cfg, data, label, model_id, split : Literal['train', 'valid',
 	Output : torch.utils.data.DataLoader
 	"""
 	dataset = IMDBDatset(cfg, data, label, model_id)
-	dataloader = DataLoader(dataset, batch_size=cfg['batch'], shuffle=(split=='train'), collate_fn=IMDBDatset.collate_fn)
+	dataloader = DataLoader(dataset, batch_size=cfg['batch'], shuffle=(split=='train'), collate_fn=IMDBDatset.collate_fn, num_workers=4)
 	return dataloader
