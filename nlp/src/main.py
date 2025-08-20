@@ -16,28 +16,26 @@ from data import get_dataloader
 import numpy as np
 from utils import parse
 from transformers import set_seed
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 from sklearn.model_selection import train_test_split
 from accelerate import Accelerator
 from collections import Counter
 
 def train_iter(model, batch, optimizer, criterion, device, accelerator, accum_step, n):
-	X= {k: v.to(device) for k, v in batch[0].items()}
-	Y=batch[1].to(device)
-#	X= {k: v for k, v in batch[0].items()}
-#	Y=batch[1]
-#	X= batch 
-#	Y=batch['label']
-#	del batch['label']
+	X= {k: v for k, v in batch[0].items()}
+	Y=batch[1]
 	prob = model(X)
 	loss = criterion(prob,Y)
 
-#	accelerator.backward(loss)
-	loss /=accum_step
-	loss.backward()
-	if (n%accum_step)==0:
-		optimizer.step()
-		optimizer.zero_grad()
+	accelerator.backward(loss)
+	optimizer.step()
+	optimizer.zero_grad()
+
+#	loss /=accum_step
+#	loss.backward()
+#	if (n%accum_step)==0:
+#		optimizer.step()
+#		optimizer.zero_grad()
 	wandb.log({'train_loss': loss.item()})
 	return loss.item()
 
@@ -50,11 +48,8 @@ def valid_iter(model, loader, criterion, device):
 	model.eval()
 	with torch.no_grad():
 		for batch in loader:
-			X= {key : value.to(device) for key, value in batch[0].items()}
-			Y=batch[1].to(device)
-#			X= batch
-#			Y=batch['label']
-#			del batch['label']
+			X= {k: v for k, v in batch[0].items()}
+			Y=batch[1]
 			prob= model(X)
 			loss=criterion(prob,Y)
 			loss_total.append(loss.item())
@@ -85,7 +80,7 @@ def main(cfg) :
 		os.mkdir(cfg['ckpt_path'])
 
 	# Load model
-	model = EncoderForClassification(cfg, model_id).to(device)
+	model = EncoderForClassification(cfg, model_id)#.to(device)
 
 	# Load data
 	data = load_dataset("imdb")
@@ -98,18 +93,15 @@ def main(cfg) :
 	valid_loader = get_dataloader(cfg, valid_x, valid_y, model_id, split="valid")	
 	test_loader = get_dataloader(cfg, test_x, test_y, model_id, split="test")	
 
-	print(len(train_x), Counter(train_y.ravel()))
-	print(len(valid_x), Counter(valid_y.ravel()))
-	print(len(test_x), Counter(test_y.ravel()))
-
-#	train_loader = get_dataloader(cfg, 'train')
-#	valid_loader = get_dataloader(cfg, 'valid')
-#	test_loader = get_dataloader(cfg, 'test')
-
 
 
 	# Set optimizer
-	optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'])
+	if cfg['optim'].lower() =='adam':
+		optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr'], weight_decay=cfg['wd'])
+	elif cfg['optim'].lower() =='adamw':
+		optimizer = torch.optim.AdamW(model.parameters(), lr=cfg['lr'], weight_decay=cfg['wd'])
+	else:
+		raise ValueError(f"Unknown Optimizer {cfg['optim']}")
 	criterion = nn.CrossEntropyLoss()#.to(device)
 
 
@@ -117,31 +109,21 @@ def main(cfg) :
 	valid_loss=[]
 	accum_step=cfg['accum_step']
 	print(f"Accelerator with {cfg['accum_step']} accum step")
-#	accelerator = Accelerator(gradient_accumulation_steps=cfg['accum_step'])
-#	model, optimizer, train_loader = accelerator.prepare(model, optimizer, train_loader)
-#	model, optimizer, train_loader, valid_loader, test_loader = accelerator.prepare(model, optimizer, train_loader, valid_loader, test_loader)
-	accelerator=None
+	accelerator = Accelerator(gradient_accumulation_steps=cfg['accum_step'])
+	model, optimizer, train_loader, valid_loader, test_loader = accelerator.prepare(model, optimizer, train_loader, valid_loader, test_loader)
+#	accelerator=None
 	for epoch in tqdm(range(1,cfg['epoch']+1)):
 		#Train model
 		model.train()
 		train_loss= []
 		n=1
 		for batch in train_loader:
-#			with accelerator.accumulate(model):
-#			loss = train_iter(model, batch, optimizer, criterion, device, accelerator, cfg['accum_step'], n)
-			X= {k: v.to(device) for k, v in batch[0].items()}
-			Y=batch[1].to(device)
-			prob = model(X)
-			loss = criterion(prob,Y)
+			with accelerator.accumulate(model):
+				loss = train_iter(model, batch, optimizer, criterion, device, accelerator, cfg['accum_step'], n)
 
-			loss /=accum_step
-			loss.backward()
-			if (n%accum_step)==0:
-				optimizer.step()
-				optimizer.zero_grad()
-			wandb.log({'train_loss': loss.item()})
-
-			train_loss.append(loss.item())
+			train_loss.append(loss)
+			wandb.log({'GPU memory Allocated': torch.cuda.memory_allocated(device)/(1024**2)})
+			wandb.log({'GPU memory Reserved': torch.cuda.memory_reserved(device)/(1024**2)})
 			n+=1
 		wandb.log({'train_avg_loss': np.mean(train_loss)})
 

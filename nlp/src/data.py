@@ -23,6 +23,8 @@ class IMDBDatset(torch.utils.data.Dataset):
 		self.data = data
 		self.label = label
 		self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+#		self.data = [self.tokenizer(data[i], return_tensors="pt", padding="max_length", truncation=True, max_length=self.cfg['max_length']) for i in range(len(self.data))]
 	   
 	def __len__(self):
 		return len(self.data)
@@ -32,6 +34,13 @@ class IMDBDatset(torch.utils.data.Dataset):
 		data = self.tokenizer(data, return_tensors="pt", padding="max_length", truncation=True, max_length=self.cfg['max_length'])
 		data['label']=copy.deepcopy(self.label[idx])
 		return data
+
+#	def __getitem__(self, idx) -> Tuple[dict, int]:
+#		data = copy.deepcopy(self.data[idx])
+#		data['label']=copy.deepcopy(self.label[idx])
+#		return data
+
+
 
 
 

@@ -24,10 +24,10 @@ class IMDBDatset(torch.utils.data.Dataset):
 		# data loading
 		imdb = load_dataset('imdb')
 		combined_dataset = concatenate_datasets([imdb['train'], imdb['test']])
-		trainval_test = combined_dataset.train_test_split(test_size=self.test_size)
+		trainval_test = combined_dataset.train_test_split(test_size=self.test_size, seed=42)
 		trainval = trainval_test['train']
 		test = trainval_test['test']
-		train_valid = trainval.train_test_split(test_size=self.valid_size)
+		train_valid = trainval.train_test_split(test_size=self.valid_size, seed=42)
 		train = train_valid['train']
 		valid = train_valid['test']
 		if self.split == 'train':
