@@ -17,5 +17,5 @@ This repository includes "bert-base-uncased" & "ModernBERT-base" training code o
 3. Moderbert-128 with AdamW (wd=0.001) improves the moderbert-128 with Adam optimizer
 4. Based the GPU memory reservation, the gradient accumulation increases the memory usage whereas it doesn't depend on the gradient accumulation step size.
 
-1. Gradient Accumulation with accelerator results
+Gradient Accumulation with accelerator results
 ![GA](./fig/accelerator_result.png)
